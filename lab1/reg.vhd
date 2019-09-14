@@ -1,9 +1,13 @@
+-- +-----+-----+-----+-----+-----+-----+-----+-----+
+-- | SUMMARY: reg.vhd                              |
+-- | Generic register with a load enable.          |
+-- +-----+-----+-----+-----+-----+-----+-----+-----+
+
 library ieee;
 use ieee.std_logic_1164.all;
 
 entity reg is
-  generic (
-    width  :     positive);
+  generic (width : positive := 8);
   port (
     clk    : in  std_logic;
     rst    : in  std_logic;
