@@ -20,7 +20,21 @@ end add_pipe;
 -- hardcoded to a specific value.
 
 architecture BHV of add_pipe is
+	signal reg : unsigned(width downto 0);
 begin
-
+	
+	process(clk, rst)
+	begin
+		if rst = '1' then
+			reg <= (others => '0');
+			
+		elsif rising_edge(clk) then
+			if en = '1' then
+				reg <= resize(unsigned(in1), width+1) + resize(unsigned(in2), width+1);
+			end if;
+		end if;
+	end process;
+	
+	output <= std_logic_vector(reg);
 end BHV;
 

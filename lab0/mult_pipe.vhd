@@ -21,7 +21,21 @@ end mult_pipe;
 -- returns a value whose width is the sum of the widths of the inputs.
 
 architecture BHV of mult_pipe is
+	signal reg : unsigned(2*width-1 downto 0);
 begin
-
+	
+	process(clk, rst)
+	begin
+		if rst = '1' then
+			reg <= (others => '0');
+			
+		elsif rising_edge(clk) then
+			if en = '1' then
+				reg <= unsigned(in1) * unsigned(in2);
+			end if;
+		end if;
+	end process;
+	
+	output <= std_logic_vector(reg);
 end BHV;
 
