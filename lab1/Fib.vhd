@@ -17,7 +17,6 @@ entity Fib is
     rst : in std_logic;
     go	: in std_logic;
 	n   : in std_logic_vector(7 downto 0);
-	
 	done : out std_logic;
 	result : out std_logic_vector(7 downto 0)
 	);
@@ -74,6 +73,7 @@ begin
 	ctrl_clkSig <= clk;		
 	ctrl_rstSig <= rst;		
 	ctrl_goSig 	<= go;	
+	ctrl_iLeN   <= dp_iLeN;
 	
 	-- datapath signals 
 	dp_clkSig <= clk;		
@@ -88,7 +88,7 @@ begin
 	dp_yLdSig 		<= ctrl_yLdSig; 		
 	dp_nLdSignal 	<= ctrl_nLdSig; 		
 	dp_resultLdSig 	<= ctrl_resultLdSig;
-	dp_iLeN 		<= ctrl_iLeN;	
+	ctrl_iLeN 		<= dp_iLeN;
 	
 	-- +-----+-----+-----+-----+-----+-----+
 	-- external port drivers
@@ -153,6 +153,119 @@ end FSMPLUSD;
 -- | algorithm as a datapath and fsm controller.   |
 -- +-----+-----+-----+-----+-----+-----+-----+-----+
 architecture FSMD of Fib is
+
+	-- fsm signals and types
+	type state_t is (S_START, S_FIB_COND, S_FIB_RUN, S_FIB_LOAD, S_DONE);
+	signal state, nextState : state_t;
+	
+	-- algorithm signals
+	signal i : std_logic_vector(7 downto 0);
+	signal regN : std_logic_vector(7 downto 0);
+	signal x : std_logic_vector(7 downto 0);
+	signal y : std_logic_vector(7 downto 0);
+	
+	signal resultEn : std_logic;
+	signal resultOut : std_logic_vector(7 downto 0);
+	signal doneSig : std_logic;
+	signal doneSigDel : std_logic;
 begin
 
+	U_RESULT : entity work.reg
+		port map (
+			clk    => clk,
+			rst    => rst,
+			en     => resultEn,
+			input  => y,
+			output => resultOut
+		);
+		
+	-- +-----+-----+-----+-----+-----+-----+
+	-- port drivers
+	-- +-----+-----+-----+-----+-----+-----+
+	result <= resultOut;
+	done <= doneSigDel;
+	
+	-- +-----+-----+-----+-----+-----+-----+
+	-- next state process 
+	-- +-----+-----+-----+-----+-----+-----+
+	process(clk, rst)
+	begin
+		if rst = '1' then
+			state <= S_START;
+		elsif rising_edge(clk) then
+			state <= nextState;
+		end if;
+	end process;
+	
+	-- +-----+-----+-----+-----+-----+-----+
+	-- fibonacci state machine
+	-- +-----+-----+-----+-----+-----+-----+
+	process(go, state)
+		variable temp : std_logic_vector(7 downto 0);
+	begin
+		
+		-- defaults to avoid latches 
+		doneSig <= '0'; 
+		resultEn <= '0'; -- by default, do not allow to values to load into reg
+		
+		-- state switching
+		case state is 
+			when S_START =>
+		
+				regN <= n; -- regN = n
+				i <= std_logic_vector(to_unsigned(3, 8)); -- i = 3
+				x <= std_logic_vector(to_unsigned(1, 8)); -- x = 1
+				y <= std_logic_vector(to_unsigned(1, 8)); -- y = 1
+				
+				-- next state conditions
+				if go = '0' then
+					nextState <= S_START;
+				else
+					nextState <= S_FIB_COND;
+				end if;
+				
+			when S_FIB_COND =>
+			
+				-- next state conditions
+				if i <= regN then
+					nextState <= S_FIB_RUN;
+				else
+					nextState <= S_FIB_LOAD;
+				end if;
+			
+			when S_FIB_RUN =>
+			
+				temp := std_logic_vector(unsigned(x) + unsigned(y)); -- temp = x+y
+				x <= y;
+				y <= temp;
+				i <= std_logic_vector(unsigned(i) + to_unsigned(1, 8));
+			
+				-- next state conditions
+				nextState <= S_FIB_COND;
+				
+			when S_FIB_LOAD => -- extra state used for stabilizing the result
+
+				nextState <= S_DONE;
+			
+			when S_DONE =>
+			
+				resultEn <= '1'; -- result = y
+				doneSig <= '1'; -- done = 1
+			
+				-- next state conditions
+				if go = '1' then
+					nextState <= S_DONE;
+				else
+					nextState <= S_START;
+				end if;
+			end case;
+	end process;
+	
+	-- delay process to line up done and doneSig
+	process(doneSig, clk)
+	begin
+		if rising_edge(clk) then
+			doneSigDel <= doneSig;
+		end if;
+	end process;
 end FSMD;

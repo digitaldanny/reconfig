@@ -34,7 +34,7 @@ end Controller;
 architecture BHV of Controller is
 
 	-- fsm signals and types
-	type state_t is (S_START, S_FIB_INIT, S_FIB_RUN, S_DONE);
+	type state_t is (S_START, S_FIB_INIT, S_FIB_DELAY, S_FIB_COND, S_FIB_RUN, S_FIB_LOAD, S_DONE);
 	signal state, nextState : state_t;
 
 begin
@@ -77,7 +77,6 @@ begin
 			when S_FIB_INIT =>
 			
 				done <= '0'; -- done = 0
-				n_ld <= '1'; -- regN = n
 				
 				-- i = 3
 				i_sel <= '0'; 	-- mux out = 3
@@ -90,9 +89,23 @@ begin
 				-- y = 1
 				y_sel <= '0'; 	-- mux out = 1
 				y_ld <= '1'; 	-- load reg
+				
+				-- regN = n
+				n_ld <= '1';
+			
+				nextState <= S_FIB_DELAY;
+				
+			when S_FIB_DELAY =>
+				nextState <= S_FIB_COND;
+				
+			when S_FIB_COND =>
 			
 				-- next state conditions
-				nextState <= S_FIB_RUN;
+				if i_le_n = '1' then
+					nextState <= S_FIB_RUN;
+				else
+					nextState <= S_FIB_LOAD;
+				end if;
 			
 			when S_FIB_RUN =>
 			
@@ -109,22 +122,16 @@ begin
 				i_ld <= '1'; -- load reg
 			
 				-- next state conditions
-				if i_le_n = '1' then
-					nextState <= S_FIB_RUN;
-				else
-					nextState <= S_DONE;
-				end if;
+				nextState <= S_FIB_DELAY;
+				
+			when S_FIB_LOAD => -- extra state used for stabilizing the result
+				
+				result_ld <= '1'; -- result = y
+				nextState <= S_DONE;
 			
 			when S_DONE =>
 			
-				result_ld <= '1'; -- result = y
 				done <= '1'; -- done = 1
-				
-				-- don't allow any more registers to load
-				i_ld <= '0';
-				x_ld <= '0';
-				y_ld <= '0';
-				n_ld <= '0';
 			
 				-- next state conditions
 				if go = '1' then
